@@ -9,6 +9,9 @@
 //! (decision 0007); draw state lives in `crate::draw`. Methods not
 //! written yet log once with their caller, so a run lists what to do next.
 #![allow(clippy::not_unsafe_ptr_arg_deref)]
+// Without a Windows host, the host-side command recording below has no
+// callers and its method arguments go unused.
+#![cfg_attr(not(windows), allow(dead_code, unused_variables, unused_mut))]
 
 use std::mem::offset_of;
 

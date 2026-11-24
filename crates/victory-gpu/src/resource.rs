@@ -4,6 +4,9 @@
 //! CPU address, as on the console; textures also get a host copy, and
 //! buffers a host copy when a draw reads them (`shadow`).
 #![allow(clippy::not_unsafe_ptr_arg_deref)]
+// Without a Windows host, the host-side sizing and placement below has no
+// callers.
+#![cfg_attr(not(windows), allow(dead_code, unused_variables))]
 
 use std::alloc::{Layout, alloc_zeroed, dealloc};
 use std::ffi::c_void;
