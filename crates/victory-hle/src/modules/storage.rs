@@ -177,6 +177,9 @@ mod tests {
     use super::*;
     use crate::modules::xgameruntime::method;
 
+    /// Needs the Windows drive mount (`files::mount`) to answer the path
+    /// calls, so it only runs on Windows.
+    #[cfg(windows)]
     #[test]
     fn serves_a_drive_over_the_title_folder_and_its_quota() {
         type Size = extern "system" fn(This, *mut usize) -> HRESULT;

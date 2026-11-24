@@ -1797,22 +1797,29 @@ impl ValueWait {
     }
 
     fn holds(&self) -> bool {
-        let bytes = if self.wide { 8 } else { 4 };
-        if self.address == 0 {
-            return true;
-        }
-        static ASK: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
-        if *ASK.get_or_init(|| std::env::var_os("VICTORY_WAIT_ASK").is_some_and(|v| v == "1"))
-            && !crate::texture::committed(self.address as *const u8, bytes)
+        #[cfg(windows)]
         {
-            return true;
+            let bytes = if self.wide { 8 } else { 4 };
+            if self.address == 0 {
+                return true;
+            }
+            static ASK: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+            if *ASK.get_or_init(|| std::env::var_os("VICTORY_WAIT_ASK").is_some_and(|v| v == "1"))
+                && !crate::texture::committed(self.address as *const u8, bytes)
+            {
+                return true;
+            }
+            // The low `bytes` bytes; the rest stays zero.
+            let mut raw = [0u8; 8];
+            if !crate::host::read_into(self.address as *const u8, &mut raw[..bytes]) {
+                return true;
+            }
+            self.holds_for(u64::from_le_bytes(raw))
         }
-        // The low `bytes` bytes; the rest stays zero.
-        let mut raw = [0u8; 8];
-        if !crate::host::read_into(self.address as *const u8, &mut raw[..bytes]) {
-            return true;
-        }
-        self.holds_for(u64::from_le_bytes(raw))
+        // Without title memory to ask (no host loader here), the wait is
+        // met, as memory that is not mapped is.
+        #[cfg(not(windows))]
+        true
     }
 
     /// Where the value waited for is: address and bytes.
