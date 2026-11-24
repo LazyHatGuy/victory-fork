@@ -488,6 +488,9 @@ pub(crate) fn host() -> Option<&'static Host> {
     HOST.get_or_init(|| match create() {
         Ok(host) => Some(host),
         Err(e) => {
+            // The reason matters under Proton (docs/proton.md), where the
+            // test binaries run without a log subscriber set up.
+            eprintln!("victory-gpu: no host D3D12 device; command lists will not run: {e}");
             tracing::warn!(error = %e, "no host D3D12 device; command lists will not run");
             None
         }

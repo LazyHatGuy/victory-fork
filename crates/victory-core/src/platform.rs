@@ -23,7 +23,7 @@ pub fn wine_version() -> Option<String> {
         return None;
     }
     // SAFETY: valid module handle; C-string literal is NUL-terminated.
-    let addr = unsafe { GetProcAddress(ntdll, c"wine_get_version".as_ptr()) };
+    let addr = unsafe { GetProcAddress(ntdll, c"wine_get_version".as_ptr().cast()) };
     let Some(addr) = addr else {
         return None; // genuine Windows: the symbol does not exist
     };
@@ -39,4 +39,22 @@ pub fn wine_version() -> Option<String> {
 #[cfg(not(windows))]
 pub fn wine_version() -> Option<String> {
     None
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn the_host_names_itself_when_it_is_wine() {
+        // Linux CI and the Windows CI both run on real hosts: `None`. The
+        // `Some` side is covered by `proton/smoke.sh`, which greps the
+        // banner this feeds (docs/proton.md).
+        let seen = super::wine_version();
+        if cfg!(windows) {
+            if let Some(v) = seen {
+                assert!(!v.is_empty(), "Wine reported an empty version");
+            }
+        } else {
+            assert_eq!(seen, None);
+        }
+    }
 }

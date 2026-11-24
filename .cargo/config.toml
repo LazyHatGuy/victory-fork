@@ -2,8 +2,10 @@
 xtask = "run --quiet --package xtask --"
 # Windows binary from a Linux box (see docs/proton.md).
 win = "build -p victory --target x86_64-pc-windows-gnu --release"
-# Type-check the tree as the Windows CI builds it, without an MSVC linker.
-win-check = "check --workspace --all-targets --target x86_64-pc-windows-msvc"
+# Type-check the Windows tree (tests included) from Linux, using the gnu
+# target's std. MSVC-specific link steps need an MSVC box (or clang/lld);
+# the Windows CI job stays that check.
+win-check = "check --workspace --all-targets --target x86_64-pc-windows-gnu"
 
 [target.x86_64-pc-windows-gnu]
 linker = "x86_64-w64-mingw32-gcc"

@@ -18,8 +18,7 @@ sudo pacman -S --needed rustup mingw-w64-gcc mingw-w64-winpthreads
 
 # the toolchain pinned in rust-toolchain.toml, plus the Windows targets
 rustup toolchain install 1.98.1
-rustup target add x86_64-pc-windows-gnu --toolchain 1.98.1   # links victory.exe
-rustup target add x86_64-pc-windows-msvc --toolchain 1.98.1  # compile-checks the MSVC tree
+rustup target add x86_64-pc-windows-gnu --toolchain 1.98.1   # builds and links victory.exe
 
 # build
 cargo win        # alias: build -p victory --target x86_64-pc-windows-gnu --release
@@ -27,8 +26,9 @@ cargo win        # alias: build -p victory --target x86_64-pc-windows-gnu --rele
 ```
 
 `cargo win-check` (`check --workspace --all-targets --target
-x86_64-pc-windows-msvc`) type-checks the tree exactly as the Windows CI
-builds it, without needing an MSVC linker — worth running before pushing.
+x86_64-pc-windows-gnu`) type-checks the whole Windows tree — tests included
+— on the Linux box. A true MSVC-target check needs `clang`/`lld` (or a
+Windows box), so the Windows CI job remains that check.
 
 ## 2. Run it under Proton
 
@@ -71,15 +71,26 @@ insists on it.
 
 ## 4. What works, what is Wine-dependent
 
-Expected to work as on Windows (the file-side commands never touch the GPU):
+Verified 2026-11-24 on GE-Proton11-11 (Wine 11.0 staging, dxvk/vkd3d-proton
+synced into the prefix as native DLLs, `ntsync` kernel driver):
 
-- `config`, `inspect`, `census`, `lib-exports`, `shader-info`.
-- `victory config` and `victory run` print a `host Wine <version>` line when
-  the ntdll under them is Wine's, so logs say which host produced them.
-
-Expected for `run`: victory creates its device through the prefix's
-`d3d12.dll` (vkd3d-proton). `dxil.dll`'s validator stays optional — under
-Wine it is usually absent, which the code already tolerates.
+- `proton/smoke.sh` passes: `config` resolves and prints the `host Wine`
+  banner, the title directory is reachable through the prefix, and `census`
+  runs against it.
+- The whole `victory-gpu` test suite runs as a Windows binary under the same
+  prefix: **106 of 111 pass**, covering device creation, the newer device
+  levels, fences, heaps, copies and queue submission — i.e. Proton really
+  does provide the D3D12 ground victory hosts on. The four failures:
+  - `indirect::tests::argument_clamp_builds` and
+    `host_list_reuses_and_grows_scratch_across_submissions`: `D3DCompile`
+    of a `cs_5_1` kernel. Wine's built-in `d3dcompiler_47` and the June-2010
+    native one (`winetricks d3dcompiler_47`) both reject the 5_1 profile; a
+    Win10-SDK-era native `d3dcompiler_47` is what that path needs.
+  - `pipeline::library::tests::a_rejected_blob_gives_an_empty_library`:
+    vkd3d-proton errors on `OpenPipelineLibrary` of a garbage blob where
+    real D3D12 hands back an empty library.
+  - `resource::tests::a_depth_planes_twin_is_drawn_into_the_plane`: the
+    depth-plane twin pipeline fails creation under vkd3d (`0x8876086C`).
 
 Known gaps and unverified areas (file an issue if you hit one):
 
@@ -91,10 +102,12 @@ Known gaps and unverified areas (file an issue if you hit one):
 - **Input/audio**: hle's gamepad and audio paths were built against Windows
   behaviour; under Wine they ride whatever Wine presents. Unverified.
 - **HDR/10-bit output**: untested under vkd3d-proton.
+- A full `victory run` of the title under Proton has not been attempted yet.
 
-## 5. CI
+## 5. Tests and CI
 
 The Ubuntu job runs the native Linux test suite; the Windows job runs the
-same suite plus clippy. Nothing in CI exercises the Proton path — this page
-is the procedure, and `proton/run.sh config` is the smoke test to run before
-reporting anything.
+same suite plus clippy. `cargo test -p xtask` checks the launch scripts
+parse and their usage text holds; `proton/smoke.sh` is the Proton-path
+smoke test — run it after touching `proton/`, and paste its output into
+bug reports.

@@ -63,13 +63,36 @@ fi
 [[ -x "$proton/proton" || -x "$proton" ]] || die "$proton is neither a Proton directory nor an executable"
 [[ -f $exe ]] || die "no $exe — build it with: cargo win"
 
-mkdir -p "$prefix"
+# Where the wine prefix really lives: the proton script derives it from
+# STEAM_COMPAT_DATA_PATH (a `pfx` dir inside it), silently over riding the
+# WINEPREFIX we set. Probe the script's own answer, and fall back through
+# the Steam convention to our plain prefix.
+if [[ -x "$proton/proton" ]]; then
+    real="$("$proton/proton" getnativepath 'C:\windows\system32' 2>/dev/null || true)"
+else
+    real=""
+fi
+[[ -n $real && -d $real ]] || real=${prefix}/pfx
+[[ -d $real ]] || real=$prefix
 
-# The prefix's Z: drive is a plain directory; linked folders appear under it,
-# so game_dir can read as e.g. Z:\game while living wherever you keep it.
-if [[ -n $z_dir ]]; then
-    mkdir -p "$prefix/drive_z"
-    ln -sfn -- "$z_dir" "$prefix/drive_z/$(basename -- "$z_dir")"
+# Z:'s root. New Wine prefixes map it to <prefix>/drive_z, and we curate
+# that: game folders linked in under --z appear as Z:\<name>. GE-Proton 10+
+# instead maps z: to `/` - the whole host filesystem is visible under Z: -
+# which also works (game_dir becomes e.g. Z:\mnt\games\title), so in that
+# mode --z is a no-op and the docs say so.
+zlink=$real/dosdevices/z:
+if [[ -e $zlink && ! -L $zlink ]]; then
+    mv "$zlink" "$real/drive_z"
+    ln -sfn -- drive_z "$zlink"
+fi
+if [[ ! -e $zlink ]]; then
+    mkdir -p "$real/drive_z"
+    ln -sfn -- drive_z "$zlink"
+fi
+zroot=$(readlink -f -- "$zlink")
+if [[ -n $z_dir && $zroot != / ]]; then
+    mkdir -p "$zroot"
+    ln -sfn -- "$z_dir" "$zroot/$(basename -- "$z_dir")"
 fi
 
 # Steam uses these when launching Proton; the proton script wants them even
@@ -77,6 +100,11 @@ fi
 export WINEPREFIX=$prefix
 export STEAM_COMPAT_DATA_PATH=$prefix
 export STEAM_COMPAT_CLIENT_INSTALL_PATH=${STEAM_COMPAT_CLIENT_INSTALL_PATH:-$HOME/.steam/Steam}
+# Proton injects through steam.exe unless it sees a UMU launch; that inject
+# forks (GUI convention) and our output dies with the orphan. UMU_ID marks
+# this as a non-Steam launch, so the script runs wine directly, waits, and
+# stdout/exit code come back to this terminal.
+export UMU_ID=victory
 
 # Wine resolves the process' Unix cwd through its Z: mapping, so a config
 # given relative to the repo root works on both sides unchanged.
@@ -86,8 +114,14 @@ if [[ -n $config ]]; then
     export VICTORY_CONFIG=$config
 fi
 
-if [[ -x "$proton/proton" ]]; then
-    exec "$proton/proton" run "$exe" "$@"
-else
+# A bare wine binary (not a Proton dir) gets the exe as-is: no dxvk/vkd3d
+# sync, so file-side commands only.
+if [[ ! -x "$proton/proton" ]]; then
     exec "$proton" "$exe" "$@"
 fi
+
+# Ask Proton for the exe's own Windows-side (Z:) path: the script takes the
+# direct-wine branch only for argv that is not a Unix absolute path.
+wexe=$("$proton/proton" getcompatpath "$exe" 2>/dev/null)
+[[ -n $wexe ]] || die "proton getcompatpath failed for $exe"
+exec "$proton/proton" waitforexitandrun "$wexe" "$@"
