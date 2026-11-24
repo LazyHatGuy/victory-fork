@@ -10,9 +10,11 @@
 # Build output
 /target/
 /tests/fixtures/*/target/
+/dist/
 
 # Local configuration (contains paths to YOUR files)
 /victory.toml
+/victory.proton.toml
 
 # Places people tend to drop data into. Keep data outside the repo instead.
 /game/
