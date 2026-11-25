@@ -37,7 +37,7 @@ Tested on one machine: Windows 11, Intel i7-14700KF, NVIDIA RTX 4070 12 GB,
 | Light in shadow | missing: the game's ray-traced bounce light and ray-traced lamp and sun shadows do not run yet, so anything the sun does not hit directly is black |
 | Frame rate in the world | 2-4 fps: 420-450 ms per frame by default, 240-350 ms with the newer switches (`VICTORY_RELAY=2`, or `VICTORY_LATE_WAIT=3 VICTORY_WIDE_BACK=1 VICTORY_CARD_BUFFERS_MIN_MB=1 VICTORY_CARD_BUFFERS_MB=1024`); it started at 3-6 seconds per frame |
 | Stability | no driver hang or device loss in normal runs (a hang introduced by the wave64 update was found and fixed: its barrier form for 64-lane programs is now off unless `VICTORY_WAVE_WIDE=1`) |
-| Linux (Proton) | the workspace builds, tests and runs its file-side commands natively; the game via `proton/run.sh` is new and untested beyond smoke tests (docs/proton.md) |
+| Linux (Proton) | the workspace builds, tests and runs its file-side commands natively; the game runs through `proton/run.sh` in a Proton prefix, with the Wine-dependent gaps in docs/proton.md |
 
 ### What this fork changed (summary)
 
